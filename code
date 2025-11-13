@@ -1,0 +1,827 @@
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+// ---------- Abstract and Inheritance Classes ----------
+
+abstract class Person {
+
+    protected String name;
+
+    protected int rollNo;
+
+    Person(String name, int rollNo) {
+
+        this.name = name;
+
+        this.rollNo = rollNo;
+
+    }
+
+    abstract void displayInfo();
+
+}
+
+class Student extends Person {
+
+    private double[] marks;
+
+    private double total;
+
+    private double average;
+
+    private char grade;
+
+    private String semester;
+
+    private String academicYear;
+
+    Student(String name, int rollNo, double[] marks, String semester, String academicYear) {
+
+        super(name, rollNo);
+
+        this.marks = marks;
+
+        this.semester = semester;
+
+        this.academicYear = academicYear;
+
+        calculateResults();
+
+    }
+
+    private void calculateResults() {
+
+        total = 0;
+
+        for (double m : marks) total += m;
+
+        average = total / marks.length;
+
+        if (average >= 90) grade = 'A';
+
+        else if (average >= 75) grade = 'B';
+
+        else if (average >= 60) grade = 'C';
+
+        else if (average >= 40) grade = 'D';
+
+        else grade = 'F';
+
+    }
+
+    public double[] getMarks() { return marks; }
+
+    public double getTotal() { return total; }
+
+    public double getAverage() { return average; }
+
+    public char getGrade() { return grade; }
+
+    public String getSemester() { return semester; }
+
+    public String getAcademicYear() { return academicYear; }
+
+    @Override
+
+    void displayInfo() {
+
+        JOptionPane.showMessageDialog(null,
+
+                "----- Student Report -----\n" +
+
+                        "Name: " + name +
+
+                        "\nRoll No: " + rollNo +
+
+                        "\nSemester: " + semester +
+
+                        "\nAcademic Year: " + academicYear +
+
+                        "\nTotal Marks: " + total +
+
+                        "\nAverage: " + average +
+
+                        "\nGrade: " + grade,
+
+                "Result", JOptionPane.INFORMATION_MESSAGE);
+
+    }
+
+}
+
+class GraduateStudent extends Student {
+
+    GraduateStudent(String name, int rollNo, double[] marks, String semester, String academicYear) {
+
+        super(name, rollNo, marks, semester, academicYear);
+
+    }
+
+}
+
+// ---------- Database Helper ----------
+
+class DatabaseHelper {
+
+    private static final String DB_URL = "jdbc:sqlite:students.db";
+
+    static {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+
+             Statement stmt = conn.createStatement()) {
+
+            String createTable = "CREATE TABLE IF NOT EXISTS students (" +
+
+                    "rollNo INTEGER PRIMARY KEY," +
+
+                    "name TEXT," +
+
+                    "semester TEXT," +
+
+                    "academicYear TEXT," +
+
+                    "math REAL," +
+
+                    "physics REAL," +
+
+                    "chemistry REAL," +
+
+                    "english REAL," +
+
+                    "computer REAL," +
+
+                    "total REAL," +
+
+                    "average REAL," +
+
+                    "grade TEXT)";
+
+            stmt.execute(createTable);
+
+            try {
+
+                stmt.execute("ALTER TABLE students ADD COLUMN semester TEXT");
+
+            } catch (SQLException ignored) { }
+
+            try {
+
+                stmt.execute("ALTER TABLE students ADD COLUMN academicYear TEXT");
+
+            } catch (SQLException ignored) { }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+    public static void insertStudent(Student s) {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+
+            String sql = "INSERT OR REPLACE INTO students (rollNo, name, semester, academicYear, math, physics, chemistry, english, computer, total, average, grade) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+
+            double[] m = s.getMarks();
+
+            pstmt.setInt(1, s.rollNo);
+
+            pstmt.setString(2, s.name);
+
+            pstmt.setString(3, s.getSemester());
+
+            pstmt.setString(4, s.getAcademicYear());
+
+            pstmt.setDouble(5, m[0]);
+
+            pstmt.setDouble(6, m[1]);
+
+            pstmt.setDouble(7, m[2]);
+
+            pstmt.setDouble(8, m[3]);
+
+            pstmt.setDouble(9, m[4]);
+
+            pstmt.setDouble(10, s.getTotal());
+
+            pstmt.setDouble(11, s.getAverage());
+
+            pstmt.setString(12, String.valueOf(s.getGrade()));
+
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+    public static void searchStudent(int rollNo) {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+
+            String sql = "SELECT * FROM students WHERE rollNo=?";
+
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+
+            pstmt.setInt(1, rollNo);
+
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+
+                String semester = rs.getString("semester");
+
+                String academicYear = rs.getString("academicYear");
+
+                if (semester == null || semester.isEmpty()) semester = "--";
+
+                if (academicYear == null || academicYear.isEmpty()) academicYear = "--";
+
+                JOptionPane.showMessageDialog(null,
+
+                        "----- Student Found -----\n" +
+
+                                "Name: " + rs.getString("name") +
+
+                                "\nRoll No: " + rs.getInt("rollNo") +
+
+                                "\nSemester: " + semester +
+
+                                "\nAcademic Year: " + academicYear +
+
+                                "\nMaths: " + rs.getDouble("math") +
+
+                                "\nPhysics: " + rs.getDouble("physics") +
+
+                                "\nChemistry: " + rs.getDouble("chemistry") +
+
+                                "\nEnglish: " + rs.getDouble("english") +
+
+                                "\nComputer: " + rs.getDouble("computer") +
+
+                                "\nTotal: " + rs.getDouble("total") +
+
+                                "\nAverage: " + rs.getDouble("average") +
+
+                                "\nGrade: " + rs.getString("grade"),
+
+                        "Student Record", JOptionPane.INFORMATION_MESSAGE);
+
+            } else {
+
+                JOptionPane.showMessageDialog(null,
+
+                        "No record found for Roll No: " + rollNo,
+
+                        "Not Found", JOptionPane.WARNING_MESSAGE);
+
+            }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+    public static Object[][] fetchAllStudents() {
+
+        List<Object[]> rows = new ArrayList<>();
+
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+
+             Statement stmt = conn.createStatement();
+
+             ResultSet rs = stmt.executeQuery("SELECT rollNo, name, semester, academicYear, total, average, grade FROM students ORDER BY rollNo")) {
+
+            while (rs.next()) {
+
+                rows.add(new Object[]{
+
+                        rs.getInt("rollNo"),
+
+                        rs.getString("name"),
+
+                        rs.getString("semester"),
+
+                        rs.getString("academicYear"),
+
+                        rs.getDouble("total"),
+
+                        rs.getDouble("average"),
+
+                        rs.getString("grade")
+
+                });
+
+            }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+        return rows.toArray(new Object[0][]);
+
+    }
+
+}
+
+// ---------- Main Application ----------
+
+public class Student_grading_system {
+
+    public static void main(String[] args) {
+
+        SwingUtilities.invokeLater(StudentGradingFrame::new);
+
+    }
+
+}
+
+class StudentGradingFrame extends JFrame {
+
+    private JTextField nameField, rollField;
+
+    private JTextField[] markFields;
+
+    private String[] subjects = {"Maths", "Physics", "Chemistry", "English", "Computer Science"};
+
+    private JLabel previewTotalLabel, previewAverageLabel, previewGradeLabel;
+
+    private JLabel statusLabel;
+
+    private DefaultTableModel tableModel;
+
+    private JComboBox<String> semesterBox;
+
+    private JTextField academicYearField;
+
+    StudentGradingFrame() {
+
+        setTitle("Student Grading System with Database");
+
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        setSize(760, 520);
+
+        setLocationRelativeTo(null);
+
+        setLayout(new BorderLayout(10, 10));
+
+        JPanel content = new JPanel(new BorderLayout(10, 10));
+
+        content.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        add(content, BorderLayout.CENTER);
+
+        JLabel header = new JLabel("Student Grading System", SwingConstants.CENTER);
+
+        header.setFont(new Font("Segoe UI", Font.BOLD, 22));
+
+        header.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        content.add(header, BorderLayout.NORTH);
+
+        JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
+
+        content.add(centerPanel, BorderLayout.CENTER);
+
+        JPanel inputPanel = new JPanel(new GridLayout(10, 2, 5, 8));
+
+        inputPanel.setBorder(new TitledBorder("Enter Student Details"));
+
+        inputPanel.add(new JLabel("Name:"));
+
+        nameField = new JTextField();
+
+        inputPanel.add(nameField);
+
+        inputPanel.add(new JLabel("Roll No:"));
+
+        rollField = new JTextField();
+
+        inputPanel.add(rollField);
+
+        inputPanel.add(new JLabel("Semester:"));
+
+        semesterBox = new JComboBox<>(new String[]{"1", "2", "3", "4", "5", "6", "7", "8"});
+
+        inputPanel.add(semesterBox);
+
+        inputPanel.add(new JLabel("Academic Year (e.g., 2024-25):"));
+
+        academicYearField = new JTextField();
+
+        inputPanel.add(academicYearField);
+
+        markFields = new JTextField[5];
+
+        for (int i = 0; i < subjects.length; i++) {
+
+            inputPanel.add(new JLabel(subjects[i] + " Marks:"));
+
+            markFields[i] = new JTextField();
+
+            inputPanel.add(markFields[i]);
+
+        }
+
+        centerPanel.add(inputPanel, BorderLayout.CENTER);
+
+        JPanel previewPanel = new JPanel(new GridLayout(3, 2, 5, 5));
+
+        previewPanel.setBorder(new TitledBorder("Live Preview"));
+
+        previewPanel.add(new JLabel("Estimated Total:"));
+
+        previewTotalLabel = new JLabel("--");
+
+        previewPanel.add(previewTotalLabel);
+
+        previewPanel.add(new JLabel("Estimated Average:"));
+
+        previewAverageLabel = new JLabel("--");
+
+        previewPanel.add(previewAverageLabel);
+
+        previewPanel.add(new JLabel("Estimated Grade:"));
+
+        previewGradeLabel = new JLabel("--");
+
+        previewPanel.add(previewGradeLabel);
+
+        centerPanel.add(previewPanel, BorderLayout.SOUTH);
+
+        JPanel rightPanel = new JPanel(new BorderLayout(5, 5));
+
+        rightPanel.setPreferredSize(new Dimension(320, 0));
+
+        rightPanel.setBorder(new TitledBorder("Saved Records"));
+
+        tableModel = new DefaultTableModel(new Object[]{"Roll No", "Name", "Semester", "Year", "Total", "Average", "Grade"}, 0) {
+
+            @Override
+
+            public boolean isCellEditable(int row, int column) {
+
+                return false;
+
+            }
+
+        };
+
+        JTable historyTable = new JTable(tableModel);
+
+        historyTable.setFillsViewportHeight(true);
+
+        rightPanel.add(new JScrollPane(historyTable), BorderLayout.CENTER);
+
+        JButton refreshButton = new JButton("Refresh Records");
+
+        refreshButton.addActionListener(e -> refreshTable());
+
+        rightPanel.add(refreshButton, BorderLayout.SOUTH);
+
+        content.add(rightPanel, BorderLayout.EAST);
+
+        JButton submitButton = new JButton("Calculate & Save");
+
+        submitButton.addActionListener(e -> calculateGrade());
+
+        JButton searchButton = new JButton("Search by Roll No");
+
+        searchButton.addActionListener(e -> searchStudent());
+
+        JButton clearButton = new JButton("Clear Fields");
+
+        clearButton.addActionListener(e -> clearInputs());
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+
+        buttonPanel.add(submitButton);
+
+        buttonPanel.add(searchButton);
+
+        buttonPanel.add(clearButton);
+
+        content.add(buttonPanel, BorderLayout.SOUTH);
+
+        statusLabel = new JLabel("Ready.");
+
+        statusLabel.setOpaque(true);
+
+        statusLabel.setBackground(new Color(245, 245, 245));
+
+        statusLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
+
+        add(statusLabel, BorderLayout.SOUTH);
+
+        attachRealtimePreview();
+
+        refreshTable();
+
+        setVisible(true);
+
+    }
+
+    private void attachRealtimePreview() {
+
+        DocumentListener listener = new DocumentListener() {
+
+            @Override
+
+            public void insertUpdate(DocumentEvent e) { updatePreview(); }
+
+            @Override
+
+            public void removeUpdate(DocumentEvent e) { updatePreview(); }
+
+            @Override
+
+            public void changedUpdate(DocumentEvent e) { updatePreview(); }
+
+        };
+
+        nameField.getDocument().addDocumentListener(listener);
+
+        rollField.getDocument().addDocumentListener(listener);
+
+        for (JTextField field : markFields) {
+
+            field.getDocument().addDocumentListener(listener);
+
+        }
+
+        academicYearField.getDocument().addDocumentListener(listener);
+
+    }
+
+    private void updatePreview() {
+
+        double total = 0.0;
+
+        int count = 0;
+
+        boolean valid = true;
+
+        for (JTextField field : markFields) {
+
+            field.setBackground(Color.white);
+
+            String text = field.getText().trim();
+
+            if (text.isEmpty()) {
+
+                valid = false;
+
+                continue;
+
+            }
+
+            try {
+
+                double value = Double.parseDouble(text);
+
+                if (value < 0 || value > 100) {
+
+                    valid = false;
+
+                    field.setBackground(new Color(255, 240, 240));
+
+                } else {
+
+                    total += value;
+
+                    count++;
+
+                }
+
+            } catch (NumberFormatException ex) {
+
+                valid = false;
+
+                field.setBackground(new Color(255, 240, 240));
+
+            }
+
+        }
+
+        if (!valid || count == 0) {
+
+            previewTotalLabel.setText("--");
+
+            previewAverageLabel.setText("--");
+
+            previewGradeLabel.setText("--");
+
+            return;
+
+        }
+
+        double average = total / markFields.length;
+
+        previewTotalLabel.setText(String.format("%.2f", total));
+
+        previewAverageLabel.setText(String.format("%.2f", average));
+
+        previewGradeLabel.setText(String.valueOf(gradeFromAverage(average)));
+
+    }
+
+    private char gradeFromAverage(double average) {
+
+        if (average >= 90) return 'A';
+
+        if (average >= 75) return 'B';
+
+        if (average >= 60) return 'C';
+
+        if (average >= 40) return 'D';
+
+        return 'F';
+
+    }
+
+    private void showStatus(String message, Color color) {
+
+        statusLabel.setText(message);
+
+        statusLabel.setBackground(color);
+
+    }
+
+    private void calculateGrade() {
+
+        try {
+
+            String name = nameField.getText().trim();
+
+            if (name.isEmpty()) throw new IllegalArgumentException("Name is required.");
+
+            int roll = Integer.parseInt(rollField.getText().trim());
+
+            String semester = (String) semesterBox.getSelectedItem();
+
+            String academicYear = academicYearField.getText().trim();
+
+            if (academicYear.isEmpty()) {
+
+                throw new IllegalArgumentException("Academic year is required.");
+
+            }
+
+            double[] marks = new double[5];
+
+            for (int i = 0; i < marks.length; i++) {
+
+                marks[i] = Double.parseDouble(markFields[i].getText().trim());
+
+                if (marks[i] < 0 || marks[i] > 100) {
+
+                    throw new IllegalArgumentException("Marks must be between 0 and 100.");
+
+                }
+
+            }
+
+            Student student = new GraduateStudent(name, roll, marks, semester, academicYear);
+
+            student.displayInfo();
+
+            DatabaseHelper.insertStudent(student);
+
+            refreshTable();
+
+            showStatus("Saved record for Roll No " + roll + " (Sem " + semester + ", " + academicYear + ")", new Color(220, 248, 198));
+
+            clearInputs();
+
+        } catch (NumberFormatException ex) {
+
+            JOptionPane.showMessageDialog(this,
+
+                    "Please enter numeric values for roll number and marks.",
+
+                    "Input Error", JOptionPane.ERROR_MESSAGE);
+
+            showStatus("Input error: numeric values required.", new Color(255, 228, 225));
+
+        } catch (IllegalArgumentException ex) {
+
+            JOptionPane.showMessageDialog(this,
+
+                    ex.getMessage(),
+
+                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+
+            showStatus("Validation error: " + ex.getMessage(), new Color(255, 228, 225));
+
+        } catch (Exception ex) {
+
+            JOptionPane.showMessageDialog(this,
+
+                    "Please enter valid inputs for all fields.",
+
+                    "Input Error", JOptionPane.ERROR_MESSAGE);
+
+            showStatus("Unexpected error occurred.", new Color(255, 228, 225));
+
+        }
+
+    }
+
+    private void searchStudent() {
+
+        try {
+
+            String input = JOptionPane.showInputDialog(this, "Enter Roll No to search:");
+
+            if (input == null) return;
+
+            int roll = Integer.parseInt(input.trim());
+
+            DatabaseHelper.searchStudent(roll);
+
+            showStatus("Lookup performed for Roll No " + roll, new Color(224, 240, 255));
+
+        } catch (Exception e) {
+
+            JOptionPane.showMessageDialog(this, "Invalid Roll Number!", "Error", JOptionPane.ERROR_MESSAGE);
+
+            showStatus("Invalid roll number provided.", new Color(255, 228, 225));
+
+        }
+
+    }
+
+    private void clearInputs() {
+
+        nameField.setText("");
+
+        rollField.setText("");
+
+        academicYearField.setText("");
+
+        semesterBox.setSelectedIndex(0);
+
+        for (JTextField field : markFields) {
+
+            field.setText("");
+
+            field.setBackground(Color.white);
+
+        }
+
+        previewTotalLabel.setText("--");
+
+        previewAverageLabel.setText("--");
+
+        previewGradeLabel.setText("--");
+
+    }
+
+    private void refreshTable() {
+
+        tableModel.setRowCount(0);
+
+        Object[][] rows = DatabaseHelper.fetchAllStudents();
+
+        for (Object[] row : rows) {
+
+            Object semester = row[2] != null ? row[2] : "--";
+
+            Object year = row[3] != null ? row[3] : "--";
+
+            tableModel.addRow(new Object[]{row[0], row[1], semester, year, row[4], row[5], row[6]});
+
+        }
+
+    }
+
+}
+
+/*javac -cp ".;sqlite-jdbc-3.50.3.0.jar" Student_grading_system.java
+
+java -cp ".;sqlite-jdbc-3.50.3.0.jar" Student_grading_system
+
+ */ 
